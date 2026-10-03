@@ -1,0 +1,52 @@
+/*
+ * The player of the video_player plugin, under the file of the download page.
+ * The skins of Video.js draw their controls in their own shadow root, this file places the player in the page
+ * and passes it the color, font and corners of the style, through the properties that the skins read:
+ * videojs.org/docs/framework/html/guides/customize-skins
+ */
+
+.kj-player {
+    /* Bootstrap 5, then Bootstrap 4, then the default style of Kleeja */
+    --media-accent-color: var(--bs-primary, var(--primary, var(--link, #0d6efd)));
+    --media-accent-text-color: #fff;
+    --media-font-family: var(--bs-body-font-family, var(--font-family-sans-serif, var(--font, system-ui, sans-serif)));
+    --media-border-radius: var(--bs-border-radius, var(--radius-lg, 0.5rem));
+    margin-top: 1.5rem;
+}
+
+/* assets/player.js hides it when the browser can't play the file */
+.kj-player[hidden] {
+    display: none !important;
+}
+
+/* the wrappers take no room, as in the global.css of Video.js, so the skin has its size before the module runs */
+.kj-player media-i18n,
+.kj-player video-player,
+.kj-player audio-player {
+    display: contents;
+}
+
+.kj-player-skin {
+    display: block;
+    width: 100%;
+}
+
+/* a wide box until the video tells its own shape, and never taller than most of the screen */
+.kj-player-video .kj-player-skin {
+    aspect-ratio: var(--kj-video-ratio, 16 / 9);
+    max-width: calc(80vh * var(--kj-video-ratio, 16 / 9));
+    margin-inline: auto;
+    background: #000;
+    border-radius: var(--media-border-radius);
+}
+
+/* the media fills the box, also with the browser's own controls when Video.js couldn't be loaded */
+.kj-player-skin > video,
+.kj-player-skin > audio {
+    display: block;
+    width: 100%;
+}
+
+.kj-player-skin > video {
+    height: 100%;
+}
