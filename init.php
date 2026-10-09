@@ -10,7 +10,7 @@ if (!defined('IN_PLUGINS_SYSTEM')) {
 }
 
 // the plugin can be loaded twice in one request, so its constants are defined once
-defined('VIDEO_PLAYER_VERSION') || define('VIDEO_PLAYER_VERSION', '2.0');
+defined('VIDEO_PLAYER_VERSION') || define('VIDEO_PLAYER_VERSION', '2.1');
 
 // Video.js 10 from jsDelivr, all its files from one version: videojs.org/docs/framework/html/guides/cdn
 defined('VIDEO_PLAYER_CDN') || define('VIDEO_PLAYER_CDN', 'https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/');
@@ -210,4 +210,78 @@ $kleeja_plugin['video_player']['functions'] = [
 
         return compact('extra');
     },
+
+    // the guide of the plugin on the help page of the control panel, its words are in language/help_{code}.php
+    'admin_help_guides' => function ($args) {
+        $help_guides = $args['help_guides'];
+        $words = video_player_help_words();
+
+        // the name of the plugin is the key, so Kleeja knows that the plugin has its guide, and shows its icon.
+        // The plugin has no page in the control panel, so the guide has no 'page' and no 'link'
+        $help_guides['video_player'] = [
+            'group' => 'plugins',
+            'title' => $words['VIDEO_PLAYER_HELP_TITLE'],
+            'intro' => $words['VIDEO_PLAYER_HELP_INTRO'],
+            // tips and warnings are shown beside the others on wide screens
+            'sections' => [
+                video_player_help_section($words, 'features', 'FEATURE'),
+                video_player_help_section($words, 'steps', 'STEP'),
+                video_player_help_section($words, 'faq', 'FAQ'),
+                video_player_help_section($words, 'tips', 'TIP'),
+                video_player_help_section($words, 'warnings', 'WARNING'),
+            ],
+        ];
+
+        return compact('help_guides');
+    },
 ];
+
+/**
+ * special functions
+ */
+
+if (!function_exists('video_player_help_words')) {
+    /**
+     * the words of the guide, in the language of the control panel, the missing ones in English
+     * @return array
+     */
+    function video_player_help_words()
+    {
+        global $config;
+
+        $words = (array) require __DIR__ . '/language/help_en.php';
+        $language = preg_replace('/[^a-z0-9_-]/i', '', (string) ($config['language'] ?? ''));
+        $translation = __DIR__ . "/language/help_{$language}.php";
+
+        if ($language !== '' && $language !== 'en' && file_exists($translation)) {
+            // in its own line, Prettier drops the brackets of (require $translation) + $words
+            $translated = require $translation;
+            $words = (array) $translated + $words;
+        }
+
+        return $words;
+    }
+
+    /**
+     * a section of the guide from its numbered words, like VIDEO_PLAYER_HELP_TIP_1, .._TIP_2 ..
+     * its title, when it has its own, is VIDEO_PLAYER_HELP_TIP_TITLE
+     * @param  array  $words
+     * @param  string $type  how Kleeja shows it: features, steps, tips, warnings or faq
+     * @param  string $name  the name of its words, VIDEO_PLAYER_HELP_{name}_1
+     * @return array
+     */
+    function video_player_help_section($words, $type, $name)
+    {
+        $prefix = 'VIDEO_PLAYER_HELP_' . $name;
+        $section = ['type' => $type, 'title' => $words[$prefix . '_TITLE'] ?? '', 'items' => []];
+
+        for ($n = 1; isset($words[$prefix . ($type == 'faq' ? '_Q_' : '_') . $n]); $n++) {
+            $section['items'][] =
+                $type == 'faq'
+                    ? ['q' => $words[$prefix . '_Q_' . $n], 'a' => $words[$prefix . '_A_' . $n] ?? '']
+                    : $words[$prefix . '_' . $n];
+        }
+
+        return $section;
+    }
+}
