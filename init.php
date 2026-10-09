@@ -1,200 +1,213 @@
 <?php
-# Kleeja Plugin
-# video_player
-# Version: 1.0
-# Developer: Kleeja team
+// Kleeja Plugin
+// video_player
+// Version: 2.0
+// Developer: Kleeja team
 
-# Prevent illegal run
+// Prevent illegal run
 if (!defined('IN_PLUGINS_SYSTEM')) {
     exit();
 }
 
+// the plugin can be loaded twice in one request, so its constants are defined once
+defined('VIDEO_PLAYER_VERSION') || define('VIDEO_PLAYER_VERSION', '2.0');
 
-# Plugin Basic Information
-$kleeja_plugin['video_player']['information'] = array(
-    # The casucal name of this plugin, anything can a human being understands
-    'plugin_title' => array(
+// Video.js 10 from jsDelivr, all its files from one version: videojs.org/docs/framework/html/guides/cdn
+defined('VIDEO_PLAYER_CDN') || define('VIDEO_PLAYER_CDN', 'https://cdn.jsdelivr.net/npm/@videojs/cdn@10.0.1/');
+
+// the chunk that registers <media-i18n>, the element that translates the player to the language of the page;
+// video.js imports it, audio.js doesn't, so the audio page loads it itself.
+// Its name changes with every version of Video.js: take the new one from the first import of video.js
+defined('VIDEO_PLAYER_CDN_I18N') || define('VIDEO_PLAYER_CDN_I18N', 'i18n-BfZDJOyu.js');
+
+// the extensions that the player plays, with their media type, which also tells the video player from the audio one
+// browsers play them in their own <video> and <audio>, but some containers aren't played everywhere
+// (Safari doesn't play MKV, only Firefox still plays Theora OGV), so assets/player.js hides the player
+// when the browser can't play the file, and the visitor still has the download button
+defined('VIDEO_PLAYER_TYPES') ||
+    define('VIDEO_PLAYER_TYPES', [
+        'mp4' => 'video/mp4',
+        'm4v' => 'video/mp4',
+        'webm' => 'video/webm',
+        'mov' => 'video/quicktime',
+        'mkv' => 'video/matroska',
+        'ogv' => 'video/ogg',
+        '3gp' => 'video/3gpp',
+        'mp3' => 'audio/mpeg',
+        'm4a' => 'audio/mp4',
+        'm4b' => 'audio/mp4',
+        'aac' => 'audio/aac',
+        'wav' => 'audio/wav',
+        'flac' => 'audio/flac',
+        'ogg' => 'audio/ogg',
+        'oga' => 'audio/ogg',
+        'opus' => 'audio/ogg',
+        'weba' => 'audio/webm',
+    ]);
+
+// Plugin Basic Information
+$kleeja_plugin['video_player']['information'] = [
+    // The casual name of this plugin, anything can a human being understands
+    'plugin_title' => [
         'en' => 'Video & Audio Player',
-        'ar' => 'مشغل فيديو وصوت'
-    ),
-    # Who wrote this plugin?
-    'plugin_developer' => 'Kleeja.com',
-    # This plugin version
-    'plugin_version' => '1.1',
-    # Explain what is this plugin, why should I use it?
-    'plugin_description' => array(
-        'en' => 'Integrate a video player in download page',
-        'ar' => 'عرض مشغل فيديو في صفحة التحميل'
-    ),
-    # Min version of Kleeja that's requiered to run this plugin
-    'plugin_kleeja_version_min' => '2.0',
-    # Max version of Kleeja that support this plugin, use 0 for unlimited
-    'plugin_kleeja_version_max' => '3.9',
-    # Should this plugin run before others?, 0 is normal, and higher number has high priority
-    'plugin_priority' => 10
-);
+        'ar' => 'مشغل فيديو وصوت',
+    ],
+    // Who wrote this plugin?
+    'plugin_developer' => 'Kleeja.net',
+    // This plugin version
+    'plugin_version' => VIDEO_PLAYER_VERSION,
+    // Explain what is this plugin, why should I use it?
+    'plugin_description' => [
+        'en' => 'Play video and audio files in their download page, with the Video.js player',
+        'ar' => 'تشغيل ملفات الفيديو والصوت في صفحة تحميلها، بمشغل Video.js',
+    ],
+    // Min version of Kleeja that's requiered to run this plugin
+    'plugin_kleeja_version_min' => '3.2.0',
+    // Max version of Kleeja that support this plugin, use 0 for unlimited
+    'plugin_kleeja_version_max' => '4.9',
+    // Should this plugin run before others?, 0 is normal, and higher number has high priority
+    'plugin_priority' => 10,
+];
 
 //after installation message, you can remove it, it's not required
-$kleeja_plugin['video_player']['first_run']['ar'] = "
+$kleeja_plugin['video_player']['first_run']['ar'] = '
 شكراً لاستخدامك هذه الإضافة قم بمراسلتنا بالأخطاء عند ظهورها على البريد: <br>
-info@kleeja.com
-";
+info@kleeja.net
+';
 
-$kleeja_plugin['video_player']['first_run']['en'] = "
-Thanks for using this plugin, to report bugs contact us: 
+$kleeja_plugin['video_player']['first_run']['en'] = '
+Thanks for using this plugin, to report bugs contact us:
 <br>
-info@kleeja.com
-";
+info@kleeja.net
+';
 
-
-# Plugin Installation function
-$kleeja_plugin['video_player']['install'] = function ($plg_id)
-{
-//    //new language variables
-//    add_olang(array(
-//
-//    ),
-//        'ar',
-//        $plg_id);
-//
-//    add_olang(array(
-//
-//    ),
-//        'en',
-//        $plg_id);
+// Plugin Installation function
+$kleeja_plugin['video_player']['install'] = function ($plg_id) {
+    // nothing to install, the player keeps no settings
 };
-
 
 //Plugin update function, called if plugin is already installed but version is different than current
 $kleeja_plugin['video_player']['update'] = function ($old_version, $new_version) {
-    // if(version_compare($old_version, '0.5', '<')){
-    // 	//... update to 0.5
-    // }
-    //
-    // if(version_compare($old_version, '0.6', '<')){
-    // 	//... update to 0.6
-    // }
-
-    //you could use update_config, update_olang
+    // the download template is compiled with the player in it, so the copies with the old player are deleted,
+    // without delete_cache(): plugins are still loading here, and it runs a hook
+    if (version_compare($old_version, '2.0', '<')) {
+        foreach (glob(PATH . 'cache/tpl_download*.php') ?: [] as $file) {
+            @unlink($file);
+        }
+    }
 };
 
-
-# Plugin Uninstallation, function to be called at unistalling
+// Plugin Uninstallation, function to be called at unistalling
 $kleeja_plugin['video_player']['uninstall'] = function ($plg_id) {
-    //delete language variables
-//    foreach (array('ar', 'en') as $language) {
-//        delete_olang(null, $language, $plg_id);
-//    }
+    // nothing to delete
 };
 
+// Plugin functions
+$kleeja_plugin['video_player']['functions'] = [
+    // the player in the download template, shown by b4_showsty_downlaod_id_filename
+    // its tags are those of videojs.org: <media-i18n> follows the language of the page,
+    // the player owns the state, the skin draws the controls, and the browser's <video> or <audio> plays the file
+    'style_parse_func' => function ($args) {
+        if ($args['template_name'] !== 'download') {
+            return;
+        }
 
-# Plugin functions
-$kleeja_plugin['video_player']['functions'] = array(
+        $html =
+            $args['html'] .
+            '
+<IF NAME="show_video_player_code">
+<div class="kj-player kj-player-video row justify-content-center" data-kj-player>
+    <div class="col-lg-10 col-xl-9">
+        <media-i18n>
+            <video-player content-title="{video_player_title}"<IF NAME="video_thumb"> poster="{video_thumb}"</IF>>
+                <video-skin class="kj-player-skin">
+                    <video src="{video_path}<UNLESS NAME="video_thumb">#t=0.1</UNLESS>" preload="metadata" playsinline></video>
+                </video-skin>
+            </video-player>
+        </media-i18n>
+    </div>
+</div>
+</IF>
+<IF NAME="show_audio_player_code">
+<div class="kj-player kj-player-audio row justify-content-center" data-kj-player>
+    <div class="col-lg-10 col-xl-9">
+        <media-i18n>
+            <audio-player content-title="{video_player_title}">
+                <audio-skin class="kj-player-skin">
+                    <audio src="{video_path}" preload="metadata"></audio>
+                </audio-skin>
+            </audio-player>
+        </media-i18n>
+    </div>
+</div>
+</IF>';
 
-    'Saaheader_links_func' => function($args){
+        return compact('html');
+    },
 
-        $extra = $args['extra'];
+    // decide the player of the file, before the download page is shown
+    'b4_showsty_downlaod_id_filename' => function ($args) {
+        global $config;
 
-        $header_codes = '<link href="//vjs.zencdn.net/6.2.7/video-js.css" rel="stylesheet">' . "\n" .
-                        '<script src="//vjs.zencdn.net/ie8/1.1.2/videojs-ie8.min.js"></script>' . "\n";
+        $show_video_player_code = $show_audio_player_code = false;
+        $video_path = $video_thumb = $video_mime_type = '';
+        $video_player_title = $args['name'] ?? '';
+        $file_info = $args['file_info'] ?? [];
+        $type = strtolower((string) ($file_info['type'] ?? ''));
 
+        if (isset(VIDEO_PLAYER_TYPES[$type])) {
+            $video_mime_type = VIDEO_PLAYER_TYPES[$type];
+            $show_audio_player_code = strpos($video_mime_type, 'audio/') === 0;
+            $show_video_player_code = !$show_audio_player_code;
 
-        $extra .= $header_codes;
+            // a full link, each part encoded, the page can be served at a pretty url
+            $video_path =
+                $config['siteurl'] .
+                implode('/', array_map('rawurlencode', explode('/', trim($file_info['folder'], '/') . '/' . $file_info['name'])));
+
+            // kj_ftp gives the link of the files it keeps on a ftp server here, and video_thumb is the poster of the video
+            extract(runHook('plugin:video_player:do_display', get_defined_vars()));
+
+            $video_path = htmlspecialchars($video_path, ENT_QUOTES);
+            $video_thumb = htmlspecialchars($video_thumb, ENT_QUOTES);
+        }
+
+        // the header adds the player's files only to the pages that show it
+        $video_player_kind = $show_video_player_code ? 'video' : ($show_audio_player_code ? 'audio' : '');
+
+        return compact(
+            'show_video_player_code',
+            'show_audio_player_code',
+            'video_path',
+            'video_thumb',
+            'video_mime_type',
+            'video_player_title',
+            'video_player_kind'
+        );
+    },
+
+    // the files of the player, only in the page that shows it: the stylesheet, the module of Video.js
+    // that registers the elements of that player, then assets/player.js, the modules run in this order after the page is parsed
+    'Saaheader_links_func' => function ($args) {
+        global $config;
+
+        $kind = $GLOBALS['video_player_kind'] ?? '';
+
+        if (!defined('IN_DOWNLOAD') || ($kind !== 'video' && $kind !== 'audio')) {
+            return;
+        }
+
+        $assets = $config['siteurl'] . KLEEJA_PLUGINS_FOLDER . '/video_player/assets/';
+        $modules = $kind === 'audio' ? [VIDEO_PLAYER_CDN . VIDEO_PLAYER_CDN_I18N] : [];
+        $modules[] = VIDEO_PLAYER_CDN . $kind . '.js';
+        $modules[] = $assets . 'player.js?v=' . VIDEO_PLAYER_VERSION;
+
+        $extra = $args['extra'] . '<link rel="stylesheet" href="' . $assets . 'player.css?v=' . VIDEO_PLAYER_VERSION . '">' . "\n";
+
+        foreach ($modules as $module) {
+            $extra .= '<script type="module" src="' . $module . '"></script>' . "\n";
+        }
 
         return compact('extra');
     },
-
-    'print_Saafooter_func' => function($args){
-        $footer = $args['footer'];
-
-        $footer = str_replace('</body>', "<script src=\"//vjs.zencdn.net/6.2.7/video.js\"></script>\n</body>", $footer);
-        return compact('footer');
-    },
-
-    'style_parse_func' => function($args) {
-        global $config;
-
-
-        if($args['template_name'] == 'download') {
-
-            $x = PHP_EOL . '<IF NAME="show_video_player_code">
-                    <div style="clear: both;"></div>
-                    <div class="videoplayerbox" style="margin-top: 20px">
-                    <video id="my-video" class="video-js vjs-16-9" controls preload="auto" width="640" height="264"
-               data-setup="{}" style="margin: 0 auto;">
-                    <source src="{video_path}#t=0.1" type=\'{video_mime_type}\'>
-                    <p class="vjs-no-js">
-                      To view this video please enable JavaScript, and consider upgrading to a web browser that
-                      <a href="http://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
-                    </p>
-                  </video>
-                  </div>
-                  </IF>';
-
-            $x .= PHP_EOL . '<IF NAME="show_audio_player_code">
-                    <div style="clear: both;"></div>
-                    <div class="videoplayerbox audiobox" style="margin-top: 20px">
-                    <audio id="my-video" class="video-js vjs-16-9" controls preload="auto" width="640" height="264"
-               data-setup="{}" style="margin: 0 auto;">
-                    <source src="{video_path}#t=0.1" type=\'{video_mime_type}\'>
-                    <p class="vjs-no-js">
-                      To listen to this audio please enable JavaScript, and consider upgrading to a web browser that
-                      <a href="http://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
-                    </p>
-                  </audio>
-                  </div>
-                  </IF>';
-
-            $html = $args['html'] . $x;
-
-            return compact('html');
-        }
-    },
-
-    'b4_showsty_downlaod_id_filename' => function($args){
-
-
-        $file_info = $args['file_info'];
-
-
-        $show_video_player_code = false;
-        $show_audio_player_code = false;
-        $video_path = '';
-        $video_thumb = '';
-        $video_mime_type = '';
-
-        $type_mimes = array(
-            'mp4' => 'video/mp4',
-            'webm' => 'video/webm',
-//            'webma' => 'audio/webm',
-            'ogg' => 'video/ogg',
-            'ogv' => 'video/ogg',
-            '3gp' => 'video/3gp',
-            'flv' => 'video/x-flv',
-            'oga' => 'audio/ogg',
-            'mp3' => 'audio/mp3',
-            'wav' => 'audio/wav',
-            'flac' => 'audio/flac',
-        );
-
-        if(in_array(strtolower($file_info['type']), array_keys($type_mimes))){
-
-                if(in_array(strtolower($file_info['type']), array('mp3', 'oga', 'wav', 'flac'))){
-                    $show_audio_player_code = true;
-                }else{
-                    $show_video_player_code = true;
-                }
-
-
-            $video_path =  "./{$file_info['folder']}/{$file_info['name']}";
-
-            $video_mime_type = $type_mimes[$file_info['type']];
-
-            is_array($plugin_run_result = Plugins::getInstance()->run('plugin:video_player:do_display', get_defined_vars())) ? extract($plugin_run_result) : null; //run hook
-
-        }
-
-        return compact('show_video_player_code', 'video_path', 'video_thumb', 'video_mime_type', 'show_audio_player_code');
-    }
-);
-
+];
